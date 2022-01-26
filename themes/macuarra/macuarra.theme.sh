@@ -8,18 +8,18 @@
 
 # hostname color
 function get_host() {
-    local hostcolor="${bold_red}"
-    [[ -z "${SSH_CLIENT}" ]] && hostcolor="${bold_purple}"
+    local defcolor="${bold_red}"
 
-    echo "${hostcolor}\h${reset_color} "
+    [ -z "${SSH_CLIENT}" ] && defcolor="${bold_purple}"
+    echo "${defcolor}\h${reset_color} "
 }
 
 # username color
 function get_user() {
-    local usercolor="${blue}"
-    [[ 0 -eq $(id -u) ]] && usercolor="${red}"
+    local defcolor="${blue}"
 
-    echo "${usercolor}\u${reset_color} "
+    [ 0 -eq $(id -u) ] && defcolor="${red}"
+    echo "${defcolor}\u${reset_color} "
 }
 
 # datetime string in a simple format
@@ -27,26 +27,54 @@ function get_timestamp() {
     echo "${gray}$(date '+%Y%m%d.%H%M')${reset_color}"
 }
 
+# get branch information
+function get_git_status() {
+    # head
+    git rev-parse --short HEAD >| "${BRANCH_HEAD}" 2>/dev/null
+
+    # status
+    [[ ! -s "${BRANCH_HEAD}" ]] && return
+
+    # info
+    git status --branch >| "${BRANCH_INFO}" 2>/dev/null
+}
+
 # branch status
 function get_branch() {
-    local status="${green}${reset_color}"
-    local shaId=$(git rev-parse --short HEAD 2> /dev/null)
+    local STATUS=""
+    local BRANCH=""
+    local SHA16=""
+
+    # head
+    git rev-parse --short HEAD >| "${BRANCH_HEAD}" 2>/dev/null
+
+    # status
+    [[ ! -s "${BRANCH_HEAD}" ]] && return
+
+    # info
+    git status --branch >| "${BRANCH_INFO}" 2>/dev/null
 
     # git branch ?
-    [ -z "${shaId}" ] && return
+    STATUS="${green}${reset_color}"
+    SHA16=$(cat "${BRANCH_HEAD}")
+
+    # branch name?
+    BRANCH=$(sed -n 's/On branch \(\w*\)/\1/p' "${BRANCH_INFO}")
 
     # pending to commit ?
-    [ "$(git status -s 2>/dev/null)" ] && status="${yellow}${reset_color}"
+    UNTRACKED=$(sed -n 's/\(Untracked\) files/\1/p' "${BRANCH_INFO}")
+    [[ -n "${UNTRACKED}" ]] && STATUS="${yellow}${reset_color}"
 
     # untracked files ?
-    [ "$(git status -s 2>/dev/null | grep '??')" ] && status="${red}${reset_color}"
+    UNSTAGED=$(sed -n 's/\(not staged\) for commit/\1/p' "${BRANCH_INFO}")
+    [[ -n "${UNSTAGED}" ]] && STATUS="${red}${reset_color}"
 
     #
-    echo "${reset_color} $(git_current_branch) [${cyan}${shaId}${reset_color}] ${status}"
+    echo "${reset_color} ${BRANCH} [${cyan}${SHA16}${reset_color}] ${STATUS}"
 }
 
 #
-function _omb_theme_PROMPT_COMMAND() {
+function prompt() {
     local ps_header="${reset_color}@$(get_host)${bold_yellow}\w ${reset_color}"
     local ps_prompt="$(get_timestamp)$(get_branch) $(get_user)\$${reset_color}"
 
@@ -60,4 +88,7 @@ elif infocmp xterm-256color >/dev/null 2>&1; then
   export TERM=xterm-256color
 fi
 
-_omb_util_add_prompt_command _omb_theme_PROMPT_COMMAND
+export BRANCH_HEAD="/tmp/${TERM_SESSION_ID/*-/}.head"
+export BRANCH_INFO="/tmp/${TERM_SESSION_ID/*-/}.branch"
+
+_omb_util_add_prompt_command prompt
