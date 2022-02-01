@@ -68,8 +68,8 @@ function _omb_theme_PROMPT_COMMAND() {
 }
 
 #
-export BRANCH_HEAD="${HOME}/.${TERM_SESSION_ID/*-/}.head"
-export BRANCH_INFO="${HOME}/.${TERM_SESSION_ID/*-/}.branch"
+export BRANCH_HEAD="$(mktemp -qt ${TERM_SESSION_ID/*-/}-head)"
+export BRANCH_INFO="$(mktemp -qt ${TERM_SESSION_ID/*-/}-branch)"
 
 #
 _omb_util_add_prompt_command _omb_theme_PROMPT_COMMAND
